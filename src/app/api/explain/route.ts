@@ -37,10 +37,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Bound the request body before JSON parsing or Gemini billing.
+    const maxBytes = 32 * 1024;
+    const declared = Number(req.headers.get('content-length') || '0');
+    if (!Number.isFinite(declared) || declared > maxBytes) {
+      return NextResponse.json({ success: false, error: 'Request too large.' }, { status: 413 });
+    }
+
     // 2. Read and parse body
     let body: unknown;
     try {
-      body = await req.json();
+      const raw = await req.text();
+      if (new TextEncoder().encode(raw).length > maxBytes) {
+        return NextResponse.json({ success: false, error: 'Request too large.' }, { status: 413 });
+      }
+      body = JSON.parse(raw);
     } catch {
       return NextResponse.json(
         { success: false, error: 'Malformed JSON payload.' },
