@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Navbar, ActiveTab } from '@/components/Navbar';
+import React, { useState } from 'react';
+import { Sidebar, ActiveTab } from '@/components/Sidebar';
+import { Header } from '@/components/Header';
 import { DashboardView } from '@/components/DashboardView';
 import { UploadView } from '@/components/UploadView';
 import { ExplorerView } from '@/components/ExplorerView';
@@ -17,14 +18,15 @@ import {
   ReviewStatus,
   GeminiExplanation,
 } from '@/types/invoice';
-import { ShieldCheck, Heart, Sparkles, AlertCircle } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('upload');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [analyses, setAnalyses] = useState<InvoiceAnalysis[]>([]);
   const [metrics, setMetrics] = useState<BatchAuditMetrics | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceAnalysis | null>(null);
   const [batchName, setBatchName] = useState<string>('Uploaded Invoice Batch');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Clear dataset handler
   const handleClearDataset = () => {
@@ -63,7 +65,7 @@ export default function Home() {
       const critical = synAnalyses.find(a => a.riskLevel === 'CRITICAL') || synAnalyses[0];
       setSelectedInvoice(critical);
     }
-    setActiveTab('dashboard');
+    setActiveTab('investigation');
   };
 
   // Human Review Decision
@@ -77,7 +79,7 @@ export default function Home() {
             reviewStatus: status,
             reviewNote: note.trim() || item.reviewNote,
             reviewedAt: now,
-            reviewedBy: 'Financial Controller',
+            reviewedBy: 'Marcus Vance · Lead Auditor',
           };
           if (selectedInvoice && selectedInvoice.invoice.id === invoiceId) {
             setSelectedInvoice(updated);
@@ -156,71 +158,68 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/60 selection:bg-blue-500/20">
-      {/* Navigation Bar */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        metrics={metrics}
-        onLoadSynthetic={handleLoadSynthetic}
-        onClearDataset={handleClearDataset}
-      />
+    <div className="min-h-screen bg-[#f8f9ff]">
+      {/* Enterprise Left Navigation Sidebar */}
+      <div className={`${mobileSidebarOpen ? 'block' : 'hidden'} lg:block`}>
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={(t) => {
+            setActiveTab(t);
+            setMobileSidebarOpen(false);
+          }}
+          metrics={metrics}
+          onLoadSynthetic={handleLoadSynthetic}
+          onClearDataset={handleClearDataset}
+        />
+      </div>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            metrics={metrics}
-            analyses={analyses}
-            onSelectInvoice={(inv) => setSelectedInvoice(inv)}
-            onNavigateTab={(tab) => setActiveTab(tab)}
-          />
-        )}
+      {/* Main Container Pushed by 64 (256px) on Desktop */}
+      <div className="lg:pl-64 flex flex-col min-h-screen">
+        {/* Top Fixed Header */}
+        <Header
+          onUploadClick={() => setActiveTab('upload')}
+          onMobileMenuToggle={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+        />
 
-        {activeTab === 'upload' && (
-          <UploadView
-            onAuditBatch={handleAuditBatch}
-            onLoadSynthetic={handleLoadSynthetic}
-          />
-        )}
+        {/* Primary Page Canvas */}
+        <main className="flex-1 pt-20 px-4 sm:px-6 lg:px-8 pb-12 w-full">
+          {activeTab === 'dashboard' && (
+            <DashboardView
+              metrics={metrics}
+              analyses={analyses}
+              onSelectInvoice={(inv) => setSelectedInvoice(inv)}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+            />
+          )}
 
-        {activeTab === 'explorer' && (
-          <ExplorerView
-            analyses={analyses}
-            onSelectInvoice={(inv) => setSelectedInvoice(inv)}
-            onNavigateTab={(tab) => setActiveTab(tab)}
-          />
-        )}
+          {activeTab === 'upload' && (
+            <UploadView
+              onAuditBatch={handleAuditBatch}
+              onLoadSynthetic={handleLoadSynthetic}
+            />
+          )}
 
-        {activeTab === 'investigation' && (
-          <InvestigationView
-            selectedInvoice={selectedInvoice}
-            allAnalyses={analyses}
-            onUpdateReview={handleUpdateReview}
-            onRequestGeminiExplanation={handleRequestGeminiExplanation}
-            onBackToExplorer={() => setActiveTab('explorer')}
-          />
-        )}
+          {activeTab === 'explorer' && (
+            <ExplorerView
+              analyses={analyses}
+              onSelectInvoice={(inv) => setSelectedInvoice(inv)}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+            />
+          )}
 
-        {activeTab === 'evaluation' && <EvaluationView />}
-      </main>
+          {activeTab === 'investigation' && (
+            <InvestigationView
+              selectedInvoice={selectedInvoice}
+              allAnalyses={analyses}
+              onUpdateReview={handleUpdateReview}
+              onRequestGeminiExplanation={handleRequestGeminiExplanation}
+              onBackToExplorer={() => setActiveTab('explorer')}
+            />
+          )}
 
-      {/* Professional Fintech Footer */}
-      <footer className="bg-white border-t border-slate-200/80 py-6 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-3">
-          <div className="flex items-center space-x-2">
-            <ShieldCheck className="w-4 h-4 text-blue-600" />
-            <span className="font-semibold text-slate-700">SpendShield AI</span>
-            <span>—</span>
-            <span>Intelligent Invoice Risk Detection & Financial Audit Agent</span>
-          </div>
-          <div className="flex items-center space-x-4">
-            <span>Prompt Wars 2026 Competition Entry</span>
-            <span>•</span>
-            <span className="font-medium text-slate-600">Deterministic Engine + Gemini 2.5 Flash</span>
-          </div>
-        </div>
-      </footer>
+          {activeTab === 'evaluation' && <EvaluationView />}
+        </main>
+      </div>
     </div>
   );
 }

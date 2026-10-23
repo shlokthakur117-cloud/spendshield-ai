@@ -4,7 +4,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'SpendShield AI — Intelligent Invoice Risk Detection & Financial Audit Agent',
   description:
-    'AI-powered invoice auditing platform for small businesses. Detects duplicate invoices, abnormal charges, and billing inconsistencies with evidence-backed Gemini AI explanations.',
+    'Enterprise-grade AI-powered invoice auditing platform. Detects duplicate invoices, abnormal charges, and billing inconsistencies with evidence-backed Gemini AI explanations.',
 };
 
 export default function RootLayout({
@@ -14,7 +14,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="min-h-screen bg-[#f8f9ff] text-[#0b1c30] font-sans antialiased">
         {children}
       </body>
     </html>
