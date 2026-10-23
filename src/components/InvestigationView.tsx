@@ -290,7 +290,7 @@ export const InvestigationView: React.FC<InvestigationViewProps> = ({
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm">Gemini AI Audit Reasoning</h3>
                   <p className="text-[11px] text-slate-500">
-                    {selectedInvoice.aiExplanation?.model_used || 'gemini-2.5-flash'} • Official Google GenAI SDK
+                    {selectedInvoice.aiExplanation?.model_used || 'gemini-3.8-flash'} • Official Google GenAI SDK
                   </p>
                 </div>
               </div>

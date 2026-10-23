@@ -38,7 +38,7 @@ SpendShield AI is an enterprise-grade financial audit platform engineered for sm
 │ Modern Fintech UI     │ │ On-Demand Gemini Reasoning (Server)  │
 │ - Live KPI Dashboard  │ │ POST /api/explain                    │
 │ - Advanced Explorer   │ │ - Official @google/genai SDK (v2.31) │
-│ - Evidence & Audit Log│ │ - gemini-2.5-flash model             │
+│ - Evidence & Audit Log│ │ - gemini-3.8-flash model             │
 │ - Evaluation Studio   │ │ - Rate limited (30 req/min)          │
 │ - Secure CSV Export   │ │ - Strict JSON schema validation      │
 └───────────────────────┘ └──────────────────────────────────────┘
@@ -73,7 +73,7 @@ SpendShield AI is an enterprise-grade financial audit platform engineered for sm
 ## 🌐 Google Technologies Implemented
 
 SpendShield AI utilizes genuine, verified Google technologies:
-1. **Google Gemini API (`gemini-2.5-flash`):** Used exclusively for on-demand natural-language explanation synthesis, plausible benign root-cause identification, and controller action guidance.
+1. **Google Gemini API (`gemini-3.8-flash`):** Used exclusively for on-demand natural-language explanation synthesis, plausible benign root-cause identification, and controller action guidance.
 2. **Official `@google/genai` TypeScript SDK (v2.31.0):** Employs the latest standard Google GenAI SDK with structured output JSON schemas (`responseMimeType: "application/json"`).
 3. **Graceful Fallback Invariant:** If `GEMINI_API_KEY` is omitted or an external network timeout occurs, SpendShield AI switches seamlessly to a deterministic rule-engine explanation. Detection accuracy and UI operations remain 100% functional.
 
