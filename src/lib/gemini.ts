@@ -111,35 +111,14 @@ Return a valid JSON object strictly matching this schema:
 }
 `;
 
-    // Use current recommended Flash model: gemini-3.8-flash (with automatic fallback to gemini-2.5-flash if needed)
-    let response;
-    let activeModel = 'gemini-3.8-flash';
-    try {
-      response = await ai.models.generateContent({
-        model: activeModel,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.2,
-        },
-      });
-    } catch (modelErr: unknown) {
-      const errStr = String(modelErr);
-      if (errStr.includes('404') || errStr.includes('NOT_FOUND') || errStr.includes('not found')) {
-        // Fallback model trial
-        activeModel = 'gemini-2.5-flash';
-        response = await ai.models.generateContent({
-          model: activeModel,
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            temperature: 0.2,
-          },
-        });
-      } else {
-        throw modelErr;
-      }
-    }
+    // A single configured model avoids repeated paid requests on model errors.
+    // Keep this override server-side; verify availability for the configured API key.
+    const activeModel = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+    const response = await ai.models.generateContent({
+      model: activeModel,
+      contents: prompt,
+      config: { responseMimeType: 'application/json', temperature: 0.2 },
+    });
 
     const text = response.text;
     if (!text) {
@@ -173,6 +152,6 @@ Return a valid JSON object strictly matching this schema:
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.warn('[Gemini Explainer Fallback Triggered]:', errorMsg);
-    return generateDeterministicFallbackExplanation(analysis, errorMsg);
+    return generateDeterministicFallbackExplanation(analysis, 'AI explanation temporarily unavailable; see server logs');
   }
 }
