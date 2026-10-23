@@ -57,8 +57,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Generate Gemini explanation (or graceful fallback)
-    const explanation = await explainInvoiceWithGemini(validation.sanitizedAnalysis);
+    // 4. Generate Gemini explanation (using server env key, or optional session override header)
+    const sessionKey = req.headers.get('x-gemini-key') || undefined;
+    const explanation = await explainInvoiceWithGemini(validation.sanitizedAnalysis, sessionKey);
 
     return NextResponse.json({
       success: true,

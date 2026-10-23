@@ -98,7 +98,7 @@ export default function Home() {
   };
 
   // Gemini AI Explanation Trigger via POST /api/explain
-  const handleRequestGeminiExplanation = async (analysis: InvoiceAnalysis) => {
+  const handleRequestGeminiExplanation = async (analysis: InvoiceAnalysis, sessionApiKey?: string) => {
     const invId = analysis.invoice.id;
 
     // Set loading state
@@ -112,9 +112,14 @@ export default function Home() {
     }
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (sessionApiKey && sessionApiKey.trim()) {
+        headers['x-gemini-key'] = sessionApiKey.trim();
+      }
+
       const res = await fetch('/api/explain', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ analysis }),
       });
 

@@ -24,7 +24,7 @@ interface InvestigationViewProps {
   selectedInvoice: InvoiceAnalysis | null;
   allAnalyses: InvoiceAnalysis[];
   onUpdateReview: (invoiceId: string, status: ReviewStatus, note: string) => void;
-  onRequestGeminiExplanation: (analysis: InvoiceAnalysis) => Promise<void>;
+  onRequestGeminiExplanation: (analysis: InvoiceAnalysis, sessionApiKey?: string) => Promise<void>;
   onBackToExplorer: () => void;
 }
 
@@ -37,6 +37,8 @@ export const InvestigationView: React.FC<InvestigationViewProps> = ({
 }) => {
   const [reviewNote, setReviewNote] = useState('');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [sessionApiKey, setSessionApiKey] = useState('');
+  const [showKeyInput, setShowKeyInput] = useState(false);
 
   if (!selectedInvoice) {
     return (
@@ -293,24 +295,56 @@ export const InvestigationView: React.FC<InvestigationViewProps> = ({
                 </div>
               </div>
 
-              <button
-                onClick={() => onRequestGeminiExplanation(selectedInvoice)}
-                disabled={selectedInvoice.aiLoading}
-                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition flex items-center space-x-1.5 disabled:opacity-50"
-              >
-                {selectedInvoice.aiLoading ? (
-                  <>
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    <span>Analyzing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3 h-3" />
-                    <span>{selectedInvoice.aiExplanation ? 'Regenerate' : 'Generate Explanation'}</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowKeyInput(!showKeyInput)}
+                  className="px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg bg-slate-50 hover:bg-slate-100 transition"
+                  title="Configure temporary Google AI Studio Gemini API key for this test session"
+                >
+                  {sessionApiKey ? '🔑 Key Configured' : '⚙️ Set API Key'}
+                </button>
+
+                <button
+                  onClick={() => onRequestGeminiExplanation(selectedInvoice, sessionApiKey)}
+                  disabled={selectedInvoice.aiLoading}
+                  className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  {selectedInvoice.aiLoading ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>Analyzing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3" />
+                      <span>{selectedInvoice.aiExplanation ? 'Regenerate' : 'Generate Explanation'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
+
+            {/* Optional Gemini API Key Configuration Drawer */}
+            {showKeyInput && (
+              <div className="my-3 p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-indigo-950">
+                    Google AI Studio Gemini API Key (Session-Only)
+                  </span>
+                  <span className="text-[10px] text-slate-500">Not saved to git or disk</span>
+                </div>
+                <input
+                  type="password"
+                  value={sessionApiKey}
+                  onChange={(e) => setSessionApiKey(e.target.value)}
+                  placeholder="Paste AIzaSy... key to test live Gemini 2.5 Flash reasoning"
+                  className="w-full px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <p className="text-[10px] text-indigo-700/80">
+                  Tip: If left blank, the app seamlessly runs in deterministic fallback mode with zero runtime errors.
+                </p>
+              </div>
+            )}
 
             {selectedInvoice.aiLoading && (
               <div className="py-12 text-center text-slate-500 text-xs space-y-2">
