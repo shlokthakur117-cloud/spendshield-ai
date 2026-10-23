@@ -57,9 +57,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Generate Gemini explanation (using server env key, or optional session override header)
-    const sessionKey = req.headers.get('x-gemini-key') || undefined;
-    const explanation = await explainInvoiceWithGemini(validation.sanitizedAnalysis, sessionKey);
+    // 4. Use only the server-configured Gemini key. Never accept client-supplied credentials.
+    const explanation = await explainInvoiceWithGemini(validation.sanitizedAnalysis);
 
     return NextResponse.json({
       success: true,
