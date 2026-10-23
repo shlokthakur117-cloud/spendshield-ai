@@ -1,4 +1,5 @@
-import { GroundTruthLabel } from '@/types/invoice';
+import { GroundTruthLabel, Invoice } from '@/types/invoice';
+import { sanitizeCsvCell } from '@/lib/security';
 
 export interface SyntheticInvoiceItem {
   invoice_id: string;
@@ -62,7 +63,6 @@ export const SYNTHETIC_INVOICES: SyntheticInvoiceItem[] = [
   { invoice_id: 'MKT-4014', vendor: 'Kinetic Digital Agency', invoice_date: '2026-05-01', amount: 2200.00, expected_amount: 2200.00, po_number: 'PO-MKT-04', currency: 'USD', category: 'Marketing' },
 
   // 35-40: Vertex Hardware & Equipment (Laptops, monitors - normal transactions without PO expected amount)
-  // Crucial test: No reference value must NOT invent a mismatch!
   { invoice_id: 'VRT-901', vendor: 'Vertex Hardware Corp', invoice_date: '2026-01-18', amount: 1850.00, currency: 'USD', category: 'Hardware' },
   { invoice_id: 'VRT-902', vendor: 'Vertex Hardware Corp', invoice_date: '2026-02-22', amount: 2100.00, currency: 'USD', category: 'Hardware' },
   { invoice_id: 'VRT-903', vendor: 'Vertex Hardware Corp', invoice_date: '2026-04-10', amount: 1950.00, currency: 'USD', category: 'Hardware' },
@@ -87,7 +87,6 @@ export const SYNTHETIC_INVOICES: SyntheticInvoiceItem[] = [
 
 // Ground truth anomaly labels stored completely separately from detector inputs
 export const GROUND_TRUTH_LABELS: GroundTruthLabel[] = [
-  // AWS Invoices
   { invoice_id: 'INV-AWS-101', isAnomaly: false, description: 'Standard recurring cloud infrastructure charge.' },
   { invoice_id: 'INV-AWS-102', isAnomaly: false, description: 'Standard recurring cloud infrastructure charge.' },
   { invoice_id: 'INV-AWS-103', isAnomaly: false, description: 'Standard recurring cloud infrastructure charge.' },
@@ -99,13 +98,11 @@ export const GROUND_TRUTH_LABELS: GroundTruthLabel[] = [
   { invoice_id: 'INV-AWS-109', isAnomaly: false, description: 'Normal AWS monthly charge.' },
   { invoice_id: 'INV-AWS-110', isAnomaly: true, expectedCategories: ['AMOUNT_MISMATCH'], description: 'Over-billed by $650 (+50%) relative to approved PO.' },
 
-  // Salesforce Invoices
   { invoice_id: 'INV-SF-2026-Q1', isAnomaly: false, description: 'Normal quarterly software subscription.' },
   { invoice_id: 'INV-SF-2026-Q2', isAnomaly: false, description: 'Normal quarterly software subscription.' },
   { invoice_id: 'INV-SF-2026-Q3', isAnomaly: true, expectedCategories: ['EXACT_DUPLICATE'], description: 'Exact duplicate invoice submitted twice under same ID and vendor.' },
   { invoice_id: 'INV-SF-2026-Q4', isAnomaly: false, description: 'Normal quarterly software subscription.' },
 
-  // Apex Office Supplies
   { invoice_id: 'APX-7741', isAnomaly: false, description: 'Normal office supplies order.' },
   { invoice_id: 'APX-7798', isAnomaly: false, description: 'Normal office supplies order.' },
   { invoice_id: 'APX-8102', isAnomaly: true, expectedCategories: ['POTENTIAL_DUPLICATE'], description: 'Near duplicate candidate paired with APX-8102-B.' },
@@ -113,21 +110,18 @@ export const GROUND_TRUTH_LABELS: GroundTruthLabel[] = [
   { invoice_id: 'APX-8450', isAnomaly: false, description: 'Normal office supplies order.' },
   { invoice_id: 'APX-8891', isAnomaly: false, description: 'Normal office supplies order.' },
 
-  // Delta Legal Advisory
   { invoice_id: 'LEG-2026-01', isAnomaly: false, description: 'Normal monthly legal retainer.' },
   { invoice_id: 'LEG-2026-02', isAnomaly: false, description: 'Normal monthly legal retainer.' },
   { invoice_id: 'LEG-2026-03', isAnomaly: false, description: 'Normal monthly legal retainer.' },
   { invoice_id: 'LEG-2026-04', isAnomaly: true, expectedCategories: ['AMOUNT_MISMATCH'], description: 'Billed $6,800 vs $3,500 PO retainer limit.' },
   { invoice_id: 'LEG-2026-05', isAnomaly: false, description: 'Normal monthly legal retainer.' },
 
-  // Kinetic Digital Agency
   { invoice_id: 'MKT-4011', isAnomaly: false, description: 'Normal agency retainer.' },
   { invoice_id: 'MKT-4012', isAnomaly: false, description: 'Normal agency retainer.' },
   { invoice_id: 'MKT-4013', isAnomaly: false, description: 'Normal agency retainer.' },
   { invoice_id: 'MKT-4099', isAnomaly: true, expectedCategories: ['FUTURE_DATE'], description: 'Future post-dated invoice (Dec 2026).' },
   { invoice_id: 'MKT-4014', isAnomaly: false, description: 'Normal agency retainer.' },
 
-  // Vertex Hardware Corp
   { invoice_id: 'VRT-901', isAnomaly: false, description: 'Clean hardware purchase without PO expected amount.' },
   { invoice_id: 'VRT-902', isAnomaly: false, description: 'Clean hardware purchase without PO expected amount.' },
   { invoice_id: 'VRT-903', isAnomaly: false, description: 'Clean hardware purchase without PO expected amount.' },
@@ -135,7 +129,6 @@ export const GROUND_TRUTH_LABELS: GroundTruthLabel[] = [
   { invoice_id: 'VRT-905', isAnomaly: false, description: 'Clean hardware purchase without PO expected amount.' },
   { invoice_id: 'VRT-999', isAnomaly: true, expectedCategories: ['AMOUNT_OUTLIER'], description: 'Unusually large hardware charge ($18,500 vs $2,000 baseline).' },
 
-  // Cloudflare Inc.
   { invoice_id: 'CF-SEC-01', isAnomaly: false, description: 'Normal recurring security billing.' },
   { invoice_id: 'CF-SEC-02', isAnomaly: false, description: 'Normal recurring security billing.' },
   { invoice_id: 'CF-SEC-03', isAnomaly: false, description: 'Normal recurring security billing.' },
@@ -143,23 +136,89 @@ export const GROUND_TRUTH_LABELS: GroundTruthLabel[] = [
   { invoice_id: 'CF-SEC-05', isAnomaly: false, description: 'Normal recurring security billing.' },
   { invoice_id: 'CF-SEC-06', isAnomaly: true, expectedCategories: ['FUTURE_DATE'], description: 'Future post-dated invoice (Nov 2026).' },
 
-  // BambooHR
   { invoice_id: 'HR-BAMBOO-01', isAnomaly: false, description: 'Normal HR software fee.' },
   { invoice_id: 'HR-BAMBOO-02', isAnomaly: false, description: 'Normal HR software fee.' },
 ];
 
+/**
+ * Sanitized CSV string exporter to prevent spreadsheet injection attacks.
+ */
 export function generateSyntheticCsvString(): string {
   const headers = ['invoice_id', 'vendor', 'invoice_date', 'amount', 'expected_amount', 'po_number', 'currency', 'category'];
   const rows = SYNTHETIC_INVOICES.map(inv => [
-    inv.invoice_id,
-    `"${inv.vendor}"`,
-    inv.invoice_date,
+    sanitizeCsvCell(inv.invoice_id),
+    sanitizeCsvCell(inv.vendor),
+    sanitizeCsvCell(inv.invoice_date),
     inv.amount.toFixed(2),
     inv.expected_amount !== undefined ? inv.expected_amount.toFixed(2) : '',
-    inv.po_number || '',
-    inv.currency,
-    `"${inv.category}"`,
+    sanitizeCsvCell(inv.po_number || ''),
+    sanitizeCsvCell(inv.currency),
+    sanitizeCsvCell(inv.category),
   ].join(','));
 
   return [headers.join(','), ...rows].join('\n');
+}
+
+/**
+ * Generates an enterprise-scale synthetic workload of 1,000 invoices
+ * across 50 vendors for throughput and scalability benchmarking.
+ */
+export function generateEnterpriseWorkload(count: number = 1000): Invoice[] {
+  const vendors = [
+    'Amazon Web Services, Inc.', 'Salesforce.com Inc.', 'Google Cloud Platform',
+    'Microsoft Azure', 'Slack Technologies', 'Zoom Video Communications',
+    'Atlassian Pty Ltd', 'HubSpot Inc.', 'Datadog Inc.', 'MongoDB Inc.',
+    'Snowflake Inc.', 'Stripe Payments', 'Twilio Inc.', 'Cloudflare Inc.',
+    'Figma Inc.', 'Notion Labs', 'GitHub Inc.', 'Box Inc.', 'Zendesk Inc.',
+    'Apex Office Supplies', 'Delta Legal Advisory LLP', 'Vertex Hardware Corp',
+    'Kinetic Digital Agency', 'BambooHR LLC', 'Workday Inc.'
+  ];
+
+  const categories = [
+    'Cloud Infrastructure', 'Software Subscriptions', 'Office Supplies',
+    'Legal & Professional', 'Marketing', 'Hardware', 'Human Resources',
+    'Facilities', 'Telecom', 'Security'
+  ];
+
+  const invoices: Invoice[] = [];
+
+  for (let i = 1; i <= count; i++) {
+    const vendorIdx = i % vendors.length;
+    const vendor = vendors[vendorIdx];
+    const category = categories[i % categories.length];
+    const month = String((i % 9) + 1).padStart(2, '0');
+    const day = String((i % 28) + 1).padStart(2, '0');
+    const date = `2026-${month}-${day}`;
+    const baseAmount = 500 + (vendorIdx * 150) + (i % 20) * 10;
+
+    let amount = baseAmount;
+    let expectedAmount: number | undefined = baseAmount;
+    let invoiceId = `ENT-INV-${10000 + i}`;
+
+    // Inject known anomalies deterministically
+    if (i % 80 === 0) {
+      // Outlier surge
+      amount = baseAmount * 12;
+    } else if (i % 65 === 0) {
+      // PO Mismatch
+      amount = baseAmount * 1.45;
+    } else if (i % 50 === 0) {
+      // Exact duplicate of previous record
+      invoiceId = `ENT-INV-${10000 + i - 1}`;
+    }
+
+    invoices.push({
+      id: `ent-inv-${i}`,
+      invoice_id: invoiceId,
+      vendor,
+      invoice_date: date,
+      amount: Math.round(amount * 100) / 100,
+      expected_amount: expectedAmount,
+      po_number: `PO-ENT-${1000 + (i % 200)}`,
+      currency: 'USD',
+      category,
+    });
+  }
+
+  return invoices;
 }

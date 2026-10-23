@@ -1,7 +1,13 @@
 import { parseInvoiceCsv } from '../src/lib/parser';
 import { runAuditDetection } from '../src/lib/engine';
 import { explainInvoiceWithGemini } from '../src/lib/gemini';
-import { SYNTHETIC_INVOICES, GROUND_TRUTH_LABELS, generateSyntheticCsvString } from '../src/data/synthetic-invoices';
+import {
+  SYNTHETIC_INVOICES,
+  GROUND_TRUTH_LABELS,
+  generateSyntheticCsvString,
+  generateEnterpriseWorkload,
+} from '../src/data/synthetic-invoices';
+import { sanitizeCsvCell, validateExplainPayload } from '../src/lib/security';
 import { Invoice } from '../src/types/invoice';
 
 interface TestResult {
@@ -21,7 +27,7 @@ function recordTest(id: number, name: string, passed: boolean, details: string) 
 
 async function runTestSuite() {
   console.log('===========================================================');
-  console.log('  SpendShield AI — Verification & Evaluation Test Suite    ');
+  console.log('  SpendShield AI — Full Verification & Security Audit      ');
   console.log('===========================================================\n');
 
   // Reference audit date: 2026-10-23
@@ -168,7 +174,6 @@ async function runTestSuite() {
       flagged: true,
       reviewStatus: 'PENDING' as const,
     };
-    // Explicitly pass empty API key
     const explanation = await explainInvoiceWithGemini(mockAnalysis, '');
     const isFallbackWorking = explanation.summary.includes('fallback mode') && explanation.evidence.length > 0;
     recordTest(9, 'Missing Gemini API key graceful fallback', isFallbackWorking, `Fallback explanation produced without crash: ${isFallbackWorking}`);
@@ -190,10 +195,23 @@ async function runTestSuite() {
   }
 
   // ----------------------------------------------------
-  // SYNTHETIC GROUND-TRUTH BENCHMARK EVALUATION
+  // TEST 11: Security — CSV Formula Injection Neutralization
+  // ----------------------------------------------------
+  try {
+    const maliciousPayload = '=cmd|"/c calc"!A0';
+    const sanitized = sanitizeCsvCell(maliciousPayload);
+    // Verified that the cell is prefixed with ' to force Excel/Sheets to treat as text
+    const passes = sanitized.startsWith("'=") || sanitized.startsWith('"\'=') || sanitized.includes("'=");
+    recordTest(11, 'CSV formula injection neutralization (CWE-1236)', passes, `Neutralized command prefix: ${sanitized}`);
+  } catch (err) {
+    recordTest(11, 'CSV formula injection neutralization (CWE-1236)', false, String(err));
+  }
+
+  // ----------------------------------------------------
+  // SYNTHETIC GROUND-TRUTH BENCHMARK EVALUATION (45 Invoices)
   // ----------------------------------------------------
   console.log('\n-----------------------------------------------------------');
-  console.log('  Running Synthetic Ground-Truth Benchmark (48 Invoices)   ');
+  console.log('  Benchmark 1: Synthetic Ground-Truth Dataset (45 Invoices) ');
   console.log('-----------------------------------------------------------');
 
   const csvContent = generateSyntheticCsvString();
@@ -202,13 +220,12 @@ async function runTestSuite() {
   const { analyses, metrics } = runAuditDetection(parsed.invoices, { referenceDate: refDate });
   const execDuration = (performance.now() - startTime).toFixed(2);
 
-  // Map ground truth labels
   const labelMap = new Map(GROUND_TRUTH_LABELS.map(l => [l.invoice_id, l]));
 
-  let tp = 0; // True Positive: Actual anomaly, flagged by system
-  let fp = 0; // False Positive: Clean invoice, flagged by system
-  let fn = 0; // False Negative: Actual anomaly, missed by system
-  let tn = 0; // True Negative: Clean invoice, correctly not flagged
+  let tp = 0;
+  let fp = 0;
+  let fn = 0;
+  let tn = 0;
 
   analyses.forEach(analysis => {
     const groundTruth = labelMap.get(analysis.invoice.invoice_id);
@@ -230,8 +247,8 @@ async function runTestSuite() {
   const recall = tp + fn > 0 ? tp / (tp + fn) : 1;
   const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
 
-  console.log(`Dataset Size: ${analyses.length} synthetic invoices`);
-  console.log(`Execution Duration: ${execDuration} ms`);
+  console.log(`Dataset Size:         ${analyses.length} synthetic invoices`);
+  console.log(`Execution Duration:   ${execDuration} ms`);
   console.log(`True Positives (TP):  ${tp}`);
   console.log(`False Positives (FP): ${fp}`);
   console.log(`False Negatives (FN): ${fn}`);
@@ -239,10 +256,28 @@ async function runTestSuite() {
   console.log(`Precision:            ${(precision * 100).toFixed(1)}%`);
   console.log(`Recall:               ${(recall * 100).toFixed(1)}%`);
   console.log(`F1 Score:             ${(f1 * 100).toFixed(1)}%`);
-  console.log('Note: Clearly labeled as synthetic benchmark test performance, not real-world claims.\n');
+
+  // ----------------------------------------------------
+  // BENCHMARK 2: Enterprise Workload Scalability (1,000 Invoices)
+  // ----------------------------------------------------
+  console.log('\n-----------------------------------------------------------');
+  console.log('  Benchmark 2: Enterprise Scalability Workload (1,000 Invoices) ');
+  console.log('-----------------------------------------------------------');
+
+  const enterpriseWorkload = generateEnterpriseWorkload(1000);
+  const start1000 = performance.now();
+  const res1000 = runAuditDetection(enterpriseWorkload, { referenceDate: refDate });
+  const duration1000 = (performance.now() - start1000).toFixed(2);
+
+  console.log(`Dataset Size:         ${res1000.analyses.length} enterprise invoices`);
+  console.log(`Execution Duration:   ${duration1000} ms`);
+  console.log(`Throughput Rate:      ${Math.round((1000 / parseFloat(duration1000)) * 1000).toLocaleString()} invoices / second`);
+  console.log(`Total Value Audited:  $${res1000.metrics.totalAnalyzedValue.toLocaleString()}`);
+  console.log(`Flagged Invoices:     ${res1000.metrics.flaggedCount}`);
+  console.log(`High/Critical Risk:   ${res1000.metrics.highRiskCount}`);
 
   const allPassed = results.every(r => r.passed);
-  console.log('===========================================================');
+  console.log('\n===========================================================');
   console.log(`Test Summary: ${results.filter(r => r.passed).length}/${results.length} PASSED`);
   console.log('===========================================================');
 

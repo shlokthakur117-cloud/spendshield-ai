@@ -12,8 +12,11 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Shield,
 } from 'lucide-react';
 import { InvoiceAnalysis, RiskLevel, ReviewStatus, AnomalyCategory } from '@/types/invoice';
+import { sanitizeCsvCell } from '@/lib/security';
 
 interface ExplorerViewProps {
   analyses: InvoiceAnalysis[];
@@ -90,6 +93,52 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
     }
   };
 
+  const handleExportFilteredCsv = () => {
+    const headers = [
+      'invoice_id',
+      'vendor',
+      'invoice_date',
+      'amount',
+      'expected_amount',
+      'po_number',
+      'currency',
+      'category',
+      'risk_level',
+      'risk_score',
+      'review_status',
+      'primary_finding',
+    ];
+
+    const rows = filteredInvoices.map(item => {
+      const inv = item.invoice;
+      const primaryFinding = item.findings[0]?.title || 'None';
+      return [
+        sanitizeCsvCell(inv.invoice_id),
+        sanitizeCsvCell(inv.vendor),
+        sanitizeCsvCell(inv.invoice_date),
+        inv.amount.toFixed(2),
+        inv.expected_amount !== undefined ? inv.expected_amount.toFixed(2) : '',
+        sanitizeCsvCell(inv.po_number || ''),
+        sanitizeCsvCell(inv.currency),
+        sanitizeCsvCell(inv.category || ''),
+        item.riskLevel,
+        item.overallScore,
+        item.reviewStatus,
+        sanitizeCsvCell(primaryFinding),
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `spendshield_audit_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const getRiskBadge = (level: RiskLevel, score: number) => {
     switch (level) {
       case 'CRITICAL':
@@ -151,11 +200,20 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 setCurrentPage(1);
               }}
               className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+              aria-label="Search Invoices"
             />
           </div>
 
-          <div className="flex items-center space-x-2 text-xs text-slate-500 w-full sm:w-auto justify-end">
-            <span>Showing {filteredInvoices.length} of {analyses.length} record(s)</span>
+          <div className="flex items-center space-x-3 w-full sm:w-auto justify-end">
+            <span className="text-xs text-slate-500">Showing {filteredInvoices.length} of {analyses.length} record(s)</span>
+            <button
+              onClick={handleExportFilteredCsv}
+              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition shadow-xs inline-flex items-center space-x-1.5"
+              title="Export sanitized CSV report protected against formula injection (CWE-1236)"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-600" />
+              <span>Export CSV</span>
+            </button>
           </div>
         </div>
 
@@ -168,6 +226,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               value={riskFilter}
               onChange={(e) => { setRiskFilter(e.target.value); setCurrentPage(1); }}
               className="border border-slate-200 bg-slate-50/50 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none"
+              aria-label="Filter by Risk Level"
             >
               <option value="ALL">All Risk Levels</option>
               <option value="CRITICAL">Critical Risk</option>
@@ -184,6 +243,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               value={categoryFilter}
               onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
               className="border border-slate-200 bg-slate-50/50 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none"
+              aria-label="Filter by Anomaly Category"
             >
               <option value="ALL">All Categories</option>
               <option value="EXACT_DUPLICATE">Exact Duplicate</option>
@@ -202,6 +262,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               value={reviewFilter}
               onChange={(e) => { setReviewFilter(e.target.value); setCurrentPage(1); }}
               className="border border-slate-200 bg-slate-50/50 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none"
+              aria-label="Filter by Review Status"
             >
               <option value="ALL">All Review Statuses</option>
               <option value="PENDING">Pending</option>
@@ -338,6 +399,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                             onNavigateTab('investigation');
                           }}
                           className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition"
+                          aria-label={`Investigate invoice ${inv.invoice_id}`}
                         >
                           Investigate
                         </button>
@@ -361,6 +423,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
                 className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Previous Page"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -368,6 +431,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
                 className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Next Page"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

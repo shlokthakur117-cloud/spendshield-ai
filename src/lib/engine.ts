@@ -99,25 +99,39 @@ export function runAuditDetection(
   const refDateStr = config.referenceDate || new Date().toISOString().split('T')[0];
   const refTimestamp = new Date(refDateStr + 'T23:59:59Z').getTime();
 
-  // Pre-group invoices by vendor and category for baselines
+  // 1. High-efficiency indexing: Pre-index invoices by vendor and exact composite key
+  // O(N) single-pass setup
   const vendorMap = new Map<string, Invoice[]>();
   const categoryMap = new Map<string, Invoice[]>();
+  const exactKeyMap = new Map<string, Invoice[]>();
 
-  invoices.forEach(inv => {
+  for (let i = 0; i < invoices.length; i++) {
+    const inv = invoices[i];
     const normVendor = normalizeVendorName(inv.vendor);
+    const normId = normalizeInvoiceId(inv.invoice_id);
+    const exactCompositeKey = `${normVendor}::${normId}`;
+
+    // Index by exact composite key
+    if (!exactKeyMap.has(exactCompositeKey)) {
+      exactKeyMap.set(exactCompositeKey, []);
+    }
+    exactKeyMap.get(exactCompositeKey)!.push(inv);
+
+    // Index by vendor
     if (!vendorMap.has(normVendor)) {
       vendorMap.set(normVendor, []);
     }
     vendorMap.get(normVendor)!.push(inv);
 
+    // Index by category
     const cat = inv.category || 'Uncategorized';
     if (!categoryMap.has(cat)) {
       categoryMap.set(cat, []);
     }
     categoryMap.get(cat)!.push(inv);
-  });
+  }
 
-  // Calculate baseline metrics per vendor (for MAD outlier detection)
+  // 2. Pre-calculate baseline metrics per vendor (for MAD outlier detection)
   const vendorBaselines = new Map<string, { median: number; mad: number; count: number }>();
   vendorMap.forEach((vendorInvoices, normVendor) => {
     if (vendorInvoices.length >= config.minimumOutlierBaseline) {
@@ -150,22 +164,14 @@ export function runAuditDetection(
     const findings: RiskFinding[] = [];
     const normVendor = normalizeVendorName(current.vendor);
     const normInvoiceId = normalizeInvoiceId(current.invoice_id);
+    const exactCompositeKey = `${normVendor}::${normInvoiceId}`;
 
     // ----------------------------------------------------
-    // RULE A: Exact Duplicate Detection
+    // RULE A: Exact Duplicate Detection (O(1) Hash Map Lookup)
     // ----------------------------------------------------
-    const exactMatches: Invoice[] = [];
-    for (let j = 0; j < invoices.length; j++) {
-      if (i === j) continue;
-      const other = invoices[j];
-      const otherNormVendor = normalizeVendorName(other.vendor);
-      const otherNormId = normalizeInvoiceId(other.invoice_id);
-
-      // Same normalized vendor AND same normalized invoice number
-      if (normVendor === otherNormVendor && normInvoiceId === otherNormId) {
-        exactMatches.push(other);
-      }
-    }
+    const allExactMatches = exactKeyMap.get(exactCompositeKey) || [];
+    // Filter out self
+    const exactMatches = allExactMatches.filter(other => other.id !== current.id);
 
     if (exactMatches.length > 0) {
       const matchIds = exactMatches.map(m => m.invoice_id);
@@ -180,24 +186,23 @@ export function runAuditDetection(
           `Vendor: "${current.vendor}" matches identical normalized name.`,
           `Invoice ID: "${current.invoice_id}" is identical.`,
           `Conflicting Record(s): ${exactMatches.map(m => `#${m.invoice_id} ($${m.amount.toFixed(2)}, dated ${m.invoice_date})`).join(', ')}.`,
-          `Deterministic Verification: Deterministic match on composite key [vendor + invoice_id].`,
+          `Deterministic Verification: Exact match on hash-indexed composite key [vendor + invoice_id].`,
         ],
         relatedInvoiceIds: matchIds,
       });
     }
 
     // ----------------------------------------------------
-    // RULE B: Potential Near Duplicate Detection
+    // RULE B: Potential Near Duplicate Detection (Scoped to Same Vendor)
     // ----------------------------------------------------
     // Only evaluate if not already an exact duplicate
     if (exactMatches.length === 0) {
+      const vendorCandidates = vendorMap.get(normVendor) || [];
       const nearMatches: { invoice: Invoice; reasons: string[]; similarity: number }[] = [];
 
-      for (let j = 0; j < invoices.length; j++) {
-        if (i === j) continue;
-        const other = invoices[j];
-        const otherNormVendor = normalizeVendorName(other.vendor);
-        if (normVendor !== otherNormVendor) continue;
+      for (let j = 0; j < vendorCandidates.length; j++) {
+        const other = vendorCandidates[j];
+        if (other.id === current.id) continue;
 
         const dayDiff = daysBetween(current.invoice_date, other.invoice_date);
         const sim = stringSimilarity(current.invoice_id, other.invoice_id);
@@ -205,7 +210,7 @@ export function runAuditDetection(
         const isSameAmount = amountDiff < 0.01;
         const isCloseAmount = amountDiff <= current.amount * 0.03; // within 3%
 
-        // Detect if IDs are merely sequential counters (e.g. 101 vs 102) across different billing cycles
+        // Detect if IDs are merely sequential counters (e.g. 101 vs 102) across different monthly billing cycles
         const isSequentialCounter = 
           dayDiff !== null && dayDiff >= 20 && 
           /\d+$/.test(current.invoice_id) && /\d+$/.test(other.invoice_id);
