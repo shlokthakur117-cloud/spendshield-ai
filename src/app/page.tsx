@@ -20,28 +20,20 @@ import {
 import { ShieldCheck, Heart, Sparkles, AlertCircle } from 'lucide-react';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('upload');
   const [analyses, setAnalyses] = useState<InvoiceAnalysis[]>([]);
   const [metrics, setMetrics] = useState<BatchAuditMetrics | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceAnalysis | null>(null);
-  const [batchName, setBatchName] = useState<string>('Synthetic Benchmark Batch');
+  const [batchName, setBatchName] = useState<string>('Uploaded Invoice Batch');
 
-  // Load the 48-invoice synthetic benchmark on startup
-  useEffect(() => {
-    const csvContent = generateSyntheticCsvString();
-    const parsed = parseInvoiceCsv(csvContent);
-    const { analyses: initialAnalyses, metrics: initialMetrics } = runAuditDetection(
-      parsed.invoices,
-      { referenceDate: '2026-10-23' }
-    );
-    setAnalyses(initialAnalyses);
-    setMetrics(initialMetrics);
-    if (initialAnalyses.length > 0) {
-      // Pre-select first critical invoice for investigation
-      const critical = initialAnalyses.find(a => a.riskLevel === 'CRITICAL') || initialAnalyses[0];
-      setSelectedInvoice(critical);
-    }
-  }, []);
+  // Clear dataset handler
+  const handleClearDataset = () => {
+    setAnalyses([]);
+    setMetrics(null);
+    setSelectedInvoice(null);
+    setBatchName('');
+    setActiveTab('upload');
+  };
 
   // Handle batch audit execution
   const handleAuditBatch = (invoices: Invoice[], sourceName: string) => {
@@ -171,6 +163,7 @@ export default function Home() {
         setActiveTab={setActiveTab}
         metrics={metrics}
         onLoadSynthetic={handleLoadSynthetic}
+        onClearDataset={handleClearDataset}
       />
 
       {/* Main Content Area */}

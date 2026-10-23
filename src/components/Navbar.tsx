@@ -21,6 +21,7 @@ interface NavbarProps {
   setActiveTab: (tab: ActiveTab) => void;
   metrics: BatchAuditMetrics | null;
   onLoadSynthetic: () => void;
+  onClearDataset?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   metrics,
   onLoadSynthetic,
+  onClearDataset,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -130,6 +132,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Quick Actions & Mobile Toggle */}
           <div className="flex items-center space-x-2">
+            {metrics && onClearDataset && (
+              <button
+                onClick={onClearDataset}
+                className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-red-200 text-xs font-semibold text-red-600 bg-red-50/50 hover:bg-red-100 transition shadow-xs"
+                title="Clear current dataset to upload a new batch"
+              >
+                <span>Clear Data</span>
+              </button>
+            )}
+
             <button
               onClick={onLoadSynthetic}
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition shadow-xs"
