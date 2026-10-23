@@ -45,43 +45,50 @@ export function validateExplainPayload(body: unknown): {
   error?: string;
   sanitizedAnalysis?: InvoiceAnalysis;
 } {
-  if (!body || typeof body !== 'object') {
-    return { valid: false, error: 'Request body must be a JSON object.' };
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { valid: false, error: 'Expected a JSON object.' };
   }
-
   const payload = body as Record<string, unknown>;
-  if (!payload.analysis || typeof payload.analysis !== 'object') {
-    return { valid: false, error: 'Missing required "analysis" object in request payload.' };
+  const analysis = payload.analysis;
+  if (!analysis || typeof analysis !== 'object' || Array.isArray(analysis)) {
+    return { valid: false, error: 'Missing analysis object.' };
   }
-
-  const analysis = payload.analysis as Record<string, unknown>;
-  if (!analysis.invoice || typeof analysis.invoice !== 'object') {
-    return { valid: false, error: 'Missing required "invoice" record inside analysis payload.' };
+  const a = analysis as Record<string, unknown>;
+  const invoice = a.invoice;
+  if (!invoice || typeof invoice !== 'object' || Array.isArray(invoice)) {
+    return { valid: false, error: 'Missing invoice object.' };
   }
-
-  const invoice = analysis.invoice as Record<string, unknown>;
-  if (!invoice.invoice_id || typeof invoice.invoice_id !== 'string') {
-    return { valid: false, error: 'Invoice must contain a valid string invoice_id.' };
+  const inv = invoice as Record<string, unknown>;
+  const validText = (v: unknown, max: number) =>
+    typeof v === 'string' && v.trim().length > 0 && v.length <= max;
+  if (!validText(inv.invoice_id, 100) || !validText(inv.vendor, 200) ||
+      !validText(inv.invoice_date, 30) || !validText(inv.currency, 3) ||
+      !Number.isFinite(inv.amount) || (inv.amount as number) < 0) {
+    return { valid: false, error: 'Invalid invoice fields.' };
   }
-
-  // Safety limits on payload size
-  if (String(invoice.invoice_id).length > 100) {
-    return { valid: false, error: 'Invoice ID exceeds maximum length of 100 characters.' };
+  if (!Number.isFinite(a.overallScore) || (a.overallScore as number) < 0 ||
+      (a.overallScore as number) > 100 ||
+      !['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(String(a.riskLevel))) {
+    return { valid: false, error: 'Invalid risk assessment.' };
   }
-  if (String(invoice.vendor || '').length > 200) {
-    return { valid: false, error: 'Vendor name exceeds maximum length of 200 characters.' };
+  if (!Array.isArray(a.findings) || a.findings.length > 25) {
+    return { valid: false, error: 'Invalid findings array.' };
   }
-
-  // Findings validation
-  if (!Array.isArray(analysis.findings)) {
-    return { valid: false, error: 'Analysis findings must be an array.' };
+  const allowedCategories = new Set([
+    'EXACT_DUPLICATE', 'POTENTIAL_DUPLICATE', 'AMOUNT_MISMATCH',
+    'AMOUNT_OUTLIER', 'FUTURE_DATE', 'DATA_QUALITY',
+  ]);
+  for (const finding of a.findings) {
+    if (!finding || typeof finding !== 'object' || Array.isArray(finding)) {
+      return { valid: false, error: 'Malformed finding.' };
+    }
+    const f = finding as Record<string, unknown>;
+    if (!allowedCategories.has(String(f.category)) ||
+        !validText(f.title, 200) || !validText(f.description, 1500) ||
+        !Array.isArray(f.evidence) || f.evidence.length > 15 ||
+        !f.evidence.every((e: unknown) => typeof e === 'string' && e.length <= 500)) {
+      return { valid: false, error: 'Invalid finding evidence.' };
+    }
   }
-  if (analysis.findings.length > 50) {
-    return { valid: false, error: 'Findings array exceeds maximum permitted length of 50 items.' };
-  }
-
-  return {
-    valid: true,
-    sanitizedAnalysis: payload.analysis as InvoiceAnalysis,
-  };
+  return { valid: true, sanitizedAnalysis: a as unknown as InvoiceAnalysis };
 }
